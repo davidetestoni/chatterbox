@@ -22,8 +22,11 @@ dependencies = [
     "spacy-pkuseg",
     "pykakasi==2.3.0",
     "gradio==5.44.1",
+    "onnx==1.18",
     "pyloudnorm",
-    "omegaconf"
+    "omegaconf",
+    "fastapi",
+    "uvicorn"
 ]
 
 [project.urls]
