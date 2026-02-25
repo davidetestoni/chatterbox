@@ -11,7 +11,18 @@ from chatterbox.tts_turbo import ChatterboxTurboTTS
 
 app = FastAPI(title="Chatterbox Turbo TTS API")
 
-model = ChatterboxTurboTTS.from_pretrained(device="cpu")
+
+def select_device(min_vram_gb: float = 6.0) -> str:
+    if not torch.cuda.is_available():
+        return "cpu"
+    try:
+        total_vram_bytes = torch.cuda.get_device_properties(0).total_memory
+    except Exception:
+        return "cpu"
+    return "cuda" if total_vram_bytes > (min_vram_gb * (1024**3)) else "cpu"
+
+
+model = ChatterboxTurboTTS.from_pretrained(device=select_device())
 BASE_DIR = Path(__file__).resolve().parent
 VOICES_DIR = BASE_DIR / "voices"
 
