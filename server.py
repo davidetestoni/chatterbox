@@ -7,9 +7,9 @@ import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
-from chatterbox.tts_turbo import ChatterboxTurboTTS
+from chatterbox.mtl_tts import ChatterboxMultilingualTTS
 
-app = FastAPI(title="Chatterbox Turbo TTS API")
+app = FastAPI(title="Chatterbox Multilingual TTS API")
 
 
 def select_device(min_vram_gb: float = 6.0) -> str:
@@ -22,7 +22,7 @@ def select_device(min_vram_gb: float = 6.0) -> str:
     return "cuda" if total_vram_bytes > (min_vram_gb * (1024**3)) else "cpu"
 
 
-model = ChatterboxTurboTTS.from_pretrained(device=select_device())
+model = ChatterboxMultilingualTTS.from_pretrained(device=select_device())
 BASE_DIR = Path(__file__).resolve().parent
 VOICES_DIR = BASE_DIR / "voices"
 
@@ -37,11 +37,17 @@ def tensor_to_pcm16le_bytes(audio: torch.Tensor) -> bytes:
 @app.post("/tts")
 async def tts(
     text: str = Form(...),
+    language: str = Form(...),
     reference_wav: UploadFile | None = File(default=None),
 ) -> Response:
     text = text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="`text` must be non-empty.")
+    language = language.strip().lower()
+    if not language:
+        raise HTTPException(status_code=400, detail="`language` must be non-empty.")
+
+    print(f"Received TTS request: language={language}, text_length={len(text)}, reference_wav={reference_wav.filename if reference_wav else None}")
 
     generate_kwargs = {}
     temp_wav_path: str | None = None
@@ -58,7 +64,9 @@ async def tts(
         generate_kwargs["audio_prompt_path"] = temp_wav_path
 
     try:
-        wav = model.generate(text, **generate_kwargs)
+        wav = model.generate(text=text, language_id=language, **generate_kwargs)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:
         if temp_wav_path is not None:
             Path(temp_wav_path).unlink(missing_ok=True)
